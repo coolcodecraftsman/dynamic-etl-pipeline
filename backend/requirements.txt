@@ -1,0 +1,24 @@
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+sqlalchemy
+asyncpg          # Postgres driver
+pymongo          # MongoDB client
+motor
+python-multipart # file uploads
+
+# Parsing libraries we'll use later
+beautifulsoup4
+lxml
+markdown
+pdfplumber
+orjson
+
+# Optional but useful
+python-dotenv
+loguru
+
+streamlit
+requests

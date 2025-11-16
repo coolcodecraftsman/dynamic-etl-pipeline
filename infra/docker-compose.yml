@@ -1,0 +1,45 @@
+version: "3.9"
+
+services:
+  etl_postgres:
+    image: postgres:16
+    container_name: etl_postgres
+    environment:
+      POSTGRES_USER: etl_user
+      POSTGRES_PASSWORD: etl_password
+      POSTGRES_DB: etl_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - etl_postgres_data:/var/lib/postgresql/data
+
+  etl_mongo:
+    image: mongo:6
+    container_name: etl_mongo
+    ports:
+      - "27018:27017"
+    volumes:
+      - etl_mongo_data:/data/db
+
+  etl_backend:
+    build:
+      context: ..
+      dockerfile: infra/backend.Dockerfile
+    container_name: etl_backend
+    depends_on:
+      - etl_postgres
+      - etl_mongo
+    environment:
+      POSTGRES_USER: etl_user
+      POSTGRES_PASSWORD: etl_password
+      POSTGRES_DB: etl_db
+      POSTGRES_HOST: etl_postgres
+      POSTGRES_PORT: 5432
+      MONGO_URI: mongodb://etl_mongo:27017
+      MONGO_DB_NAME: etl
+    ports:
+      - "8000:8000"
+
+volumes:
+  etl_postgres_data:
+  etl_mongo_data:
