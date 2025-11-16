@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+
+# Virtual environments
+backend/.venv/
+dashboard/.venv/
+
+# Environment files
+*.env
+
+# Streamlit cache
+dashboard/.streamlit/
+
+# Docker data (volumes)
+infra/etl_mongo_data/
+infra/etl_postgres_data/
+
+# VSCode
+.vscode/
