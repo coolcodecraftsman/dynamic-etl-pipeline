@@ -60,22 +60,22 @@ class SchemaInferenceService:
 
         for frag in frags:
             if frag.fragment_type == "json":
-                cursor = mongo.json_fragments.find().limit(50)
+                cursor = mongo.json_fragments.find({"fragment_id": frag.id}).limit(50)
                 async for doc in cursor:
                     doc.pop("_id", None)
                     SchemaInferenceService.merge_field_types(fields, doc)
             elif frag.fragment_type == "csv":
-                cursor = mongo.csv_fragments.find().limit(50)
+                cursor = mongo.csv_fragments.find({"fragment_id": frag.id}).limit(50)
                 async for doc in cursor:
                     doc.pop("_id", None)
                     SchemaInferenceService.merge_field_types(fields, doc)
-            elif frag.fragment_type == "html_table":
-                cursor = mongo.html_tables.find().limit(50)
+            elif frag.fragment_type == "html":
+                cursor = mongo.html_tables.find({"fragment_id": frag.id}).limit(50)
                 async for doc in cursor:
                     doc.pop("_id", None)
                     SchemaInferenceService.merge_field_types(fields, doc)
             elif frag.fragment_type == "kv":
-                cursor = mongo.kv_fragments.find().limit(50)
+                cursor = mongo.kv_fragments.find({"fragment_id": frag.id}).limit(50)
                 async for doc in cursor:
                     doc.pop("_id", None)
                     SchemaInferenceService.merge_field_types(fields, doc)

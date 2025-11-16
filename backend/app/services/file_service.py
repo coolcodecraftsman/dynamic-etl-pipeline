@@ -1,5 +1,6 @@
 import hashlib
 import mimetypes
+import uuid
 from typing import Optional
 from fastapi import UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,15 +47,29 @@ class FileService:
         text_excerpt: str,
         size_bytes: int,
     ) -> UploadedFile:
-        stmt = select(UploadedFile).where(UploadedFile.content_hash == content_hash)
-        result = await session.execute(stmt)
-        existing = result.scalars().first()
-        if existing:
-            return existing
+        if source_id:
+            stmt = select(UploadedFile).where(
+                UploadedFile.source_id == source_id,
+                UploadedFile.content_hash == content_hash,
+            )
+            result = await session.execute(stmt)
+            existing = result.scalars().first()
+            if existing:
+                return existing
+        else:
+            stmt = select(UploadedFile).where(UploadedFile.content_hash == content_hash)
+            result = await session.execute(stmt)
+            existing = result.scalars().first()
+            if existing:
+                return existing
+
+        filename = file.filename
+        if not filename:
+            filename = source_id or str(uuid.uuid4())
 
         uploaded = UploadedFile(
             source_id=source_id,
-            filename=file.filename,
+            filename=filename,
             content_type=file.content_type,
             size_bytes=size_bytes,
             content_hash=content_hash,

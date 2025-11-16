@@ -2,10 +2,6 @@ import json
 import requests
 import streamlit as st
 
-# =====================================
-# CONFIG
-# =====================================
-
 DEFAULT_API_BASE = "http://localhost:8000/api/v1"
 
 st.set_page_config(
@@ -13,9 +9,6 @@ st.set_page_config(
     layout="wide",
 )
 
-# =====================================
-# HELPERS
-# =====================================
 
 def get_api_base() -> str:
     if "api_base" not in st.session_state:
@@ -37,10 +30,6 @@ def call_api(method: str, path: str, **kwargs):
 def pretty_json(data):
     st.json(data)
 
-
-# =====================================
-# SIDEBAR
-# =====================================
 
 st.sidebar.title("Settings")
 
@@ -64,10 +53,6 @@ mode = st.sidebar.radio(
     ],
 )
 
-
-# =====================================
-# PAGES
-# =====================================
 
 def page_overview():
     st.title("Dynamic ETL Pipeline Dashboard")
@@ -212,35 +197,28 @@ def page_file_fragments():
     file_id = st.text_input("File ID", help="Paste a file_id from the Sources & Files page")
     fragment_type = st.selectbox(
         "Fragment type (optional filter)",
-        ["", "json", "csv", "kv", "html_table", "text"],
+        ["", "json", "csv", "kv", "html", "text"],
     )
 
     if st.button("Load fragments"):
         if not file_id:
             st.warning("Enter a file ID first.")
-            return
+        else:
+            params = {}
+            if fragment_type:
+                params["fragment_type"] = fragment_type
+            resp = call_api("get", f"/files/{file_id}/fragments", params=params)
+            if resp is not None and resp.status_code == 200:
+                st.session_state.fragments_data = resp.json()
+            elif resp is not None:
+                st.error(f"Error: {resp.status_code} - {resp.text}")
+                st.session_state.fragments_data = None
+            else:
+                st.session_state.fragments_data = None
 
-        params = {}
-        if fragment_type:
-            params["fragment_type"] = fragment_type
-
-        resp = call_api("get", f"/files/{file_id}/fragments", params=params)
-        if resp is None:
-            return
-
-        try:
-            data = resp.json()
-        except Exception:
-            st.write(resp.text)
-            return
-
-        if not isinstance(data, list) or not data:
-            st.info("No fragments found for this file.")
-            return
-
+    if "fragments_data" in st.session_state and st.session_state.fragments_data:
+        data = st.session_state.fragments_data
         st.success(f"Total fragments: {len(data)}")
-
-        # Group fragments by type
         by_type = {}
         for frag in data:
             t = frag.get("fragment_type", "unknown")
@@ -250,38 +228,22 @@ def page_file_fragments():
             st.markdown(f"### Fragment type: `{t}` ({len(frags)})")
             for frag in frags:
                 label = f"ID: {frag['id']} | records={frag.get('record_count')}"
-
                 with st.expander(label):
                     st.markdown("**Fragment metadata (Postgres):**")
-                    st.json(
-                        {
-                            "id": frag["id"],
-                            "file_id": frag["file_id"],
-                            "fragment_type": frag["fragment_type"],
-                            "start_offset": frag["start_offset"],
-                            "end_offset": frag["end_offset"],
-                            "record_count": frag["record_count"],
-                        }
-                    )
-
+                    st.json({k: v for k, v in frag.items() if k != "preview_json"})
                     preview = frag.get("preview_json")
                     st.markdown("**Preview (parsed if possible):**")
                     if preview is None:
                         st.write("No preview_json stored.")
+                    elif isinstance(preview, list):
+                        if len(preview) > 0 and isinstance(preview[0], dict):
+                            st.dataframe(preview)
+                        else:
+                            st.json(preview)
+                    elif isinstance(preview, dict):
+                        st.json(preview)
                     else:
-                        try:
-                            parsed = json.loads(preview)
-                            if isinstance(parsed, list):
-                                if len(parsed) > 0 and isinstance(parsed[0], dict):
-                                    st.dataframe(parsed)
-                                else:
-                                    st.json(parsed)
-                            elif isinstance(parsed, dict):
-                                st.json(parsed)
-                            else:
-                                st.text(preview)
-                        except Exception:
-                            st.text(preview)
+                        st.text(str(preview))
 
 
 def page_schema_explorer():
@@ -297,22 +259,22 @@ def page_schema_explorer():
                 st.warning("Enter a source ID first.")
             else:
                 resp = call_api("post", f"/schema/infer/{source_id}")
-                if resp is not None:
-                    st.write(f"Status: {resp.status_code}")
-                    try:
-                        payload = resp.json()
-                        st.subheader("Inference Result Row")
-                        st.json(payload)
+                if resp is not None and resp.status_code == 200:
+                    st.session_state.infer_schema_data = resp.json()
+                elif resp is not None:
+                    st.error(f"Error: {resp.status_code} - {resp.text}")
+                    st.session_state.infer_schema_data = None
+                else:
+                    st.session_state.infer_schema_data = None
 
-                        schema_raw = payload.get("schema")
-                        if schema_raw:
-                            try:
-                                st.subheader("Parsed Schema")
-                                st.json(json.loads(schema_raw))
-                            except Exception:
-                                st.write(schema_raw)
-                    except Exception:
-                        st.write(resp.text)
+        if "infer_schema_data" in st.session_state and st.session_state.infer_schema_data:
+            payload = st.session_state.infer_schema_data
+            st.subheader("Inference Result Row")
+            st.json(payload)
+            schema_raw = payload.get("schema")
+            if schema_raw:
+                st.subheader("Parsed Schema")
+                st.json(schema_raw)
 
     with col2:
         if st.button("Get latest schema"):
@@ -320,22 +282,22 @@ def page_schema_explorer():
                 st.warning("Enter a source ID first.")
             else:
                 resp = call_api("get", f"/schema/{source_id}/latest")
-                if resp is not None:
-                    st.write(f"Status: {resp.status_code}")
-                    try:
-                        payload = resp.json()
-                        st.subheader("Latest Schema Row")
-                        st.json(payload)
+                if resp is not None and resp.status_code == 200:
+                    st.session_state.latest_schema_data = resp.json()
+                elif resp is not None:
+                    st.error(f"Error: {resp.status_code} - {resp.text}")
+                    st.session_state.latest_schema_data = None
+                else:
+                    st.session_state.latest_schema_data = None
 
-                        schema_raw = payload.get("schema")
-                        if schema_raw:
-                            try:
-                                st.subheader("Parsed Schema")
-                                st.json(json.loads(schema_raw))
-                            except Exception:
-                                st.write(schema_raw)
-                    except Exception:
-                        st.write(resp.text)
+        if "latest_schema_data" in st.session_state and st.session_state.latest_schema_data:
+            payload = st.session_state.latest_schema_data
+            st.subheader("Latest Schema Row")
+            st.json(payload)
+            schema_raw = payload.get("schema")
+            if schema_raw:
+                st.subheader("Parsed Schema")
+                st.json(schema_raw)
 
     with col3:
         if st.button("List all schema versions"):
@@ -415,72 +377,47 @@ def page_schema_diff():
     if st.button("Compare versions"):
         if not source_id:
             st.warning("Enter a source ID first.")
-            return
-        if v1 == v2:
+        elif v1 == v2:
             st.warning("Choose two different versions.")
-            return
+        else:
+            params = {"v1": int(v1), "v2": int(v2)}
+            resp = call_api("get", f"/schema/compare/{source_id}", params=params)
+            if resp is not None and resp.status_code == 200:
+                st.session_state.schema_diff_data = resp.json()
+            elif resp is not None:
+                st.error(f"Error: {resp.status_code} - {resp.text}")
+                st.session_state.schema_diff_data = None
+            else:
+                st.session_state.schema_diff_data = None
 
-        params = {"v1": int(v1), "v2": int(v2)}
-        resp = call_api("get", f"/schema/compare/{source_id}", params=params)
-        if resp is None:
-            return
-
-        try:
-            payload = resp.json()
-        except Exception:
-            st.write(resp.text)
-            return
-
-        st.write(f"Status: {resp.status_code}")
+    if "schema_diff_data" in st.session_state and st.session_state.schema_diff_data:
+        payload = st.session_state.schema_diff_data
         st.subheader("Raw Diff Response")
         st.json(payload)
-
         diff = payload.get("diff")
-        if not diff:
-            st.info("No diff information available.")
-            return
-
-        added = diff.get("added_fields", [])
-        removed = diff.get("removed_fields", [])
-        changed = diff.get("changed_fields", {})
-
-        st.markdown("### Summary")
-        col_a, col_b, col_c = st.columns(3)
-        with col_a:
-            st.metric("Added fields", len(added))
-        with col_b:
-            st.metric("Removed fields", len(removed))
-        with col_c:
-            st.metric("Changed fields", len(changed))
-
-        st.markdown("### Details")
-
-        col1, col2, col3 = st.columns(3)
-        with col1:
-            st.markdown("#### Added Fields")
-            if added:
-                st.json(added)
-            else:
-                st.write("None")
-
-        with col2:
-            st.markdown("#### Removed Fields")
-            if removed:
-                st.json(removed)
-            else:
-                st.write("None")
-
-        with col3:
-            st.markdown("#### Changed Fields")
-            if changed:
-                st.json(changed)
-            else:
-                st.write("None")
-
-
-# =====================================
-# ROUTER
-# =====================================
+        if diff:
+            added = diff.get("added_fields", [])
+            removed = diff.get("removed_fields", [])
+            changed = diff.get("changed_fields", {})
+            st.markdown("### Summary")
+            col_a, col_b, col_c = st.columns(3)
+            with col_a:
+                st.metric("Added fields", len(added))
+            with col_b:
+                st.metric("Removed fields", len(removed))
+            with col_c:
+                st.metric("Changed fields", len(changed))
+            st.markdown("### Details")
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.markdown("#### Added Fields")
+                st.json(added) if added else st.write("None")
+            with col2:
+                st.markdown("#### Removed Fields")
+                st.json(removed) if removed else st.write("None")
+            with col3:
+                st.markdown("#### Changed Fields")
+                st.json(changed) if changed else st.write("None")
 
 if mode == "Overview":
     page_overview()

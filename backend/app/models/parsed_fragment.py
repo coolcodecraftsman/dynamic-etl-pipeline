@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import Column, String, Integer, ForeignKey, Text
+from sqlalchemy import Column, String, Integer, ForeignKey, JSON
 from app.models import Base
 
 
@@ -12,4 +12,4 @@ class ParsedFragment(Base):
     start_offset = Column(Integer, nullable=True)
     end_offset = Column(Integer, nullable=True)
     record_count = Column(Integer, nullable=True)
-    preview_json = Column(Text, nullable=True)
+    preview_json = Column(JSON, nullable=True)

@@ -57,6 +57,25 @@ class FragmentSaver:
             session.add(fragment)
 
     @staticmethod
+    async def save_text_block(
+        session: AsyncSession,
+        file_id: str,
+        text_block: str,
+    ) -> None:
+        """
+        Saves the unstructured text block.
+        """
+        fragment = ParsedFragment(
+            file_id=file_id,
+            fragment_type="text",
+            start_offset=0,
+            end_offset=len(text_block),
+            record_count=1,
+            preview_json={"text": text_block[:1000]},
+        )
+        session.add(fragment)
+
+    @staticmethod
     async def save_csv_blocks(
         session: AsyncSession,
         file_id: str,
